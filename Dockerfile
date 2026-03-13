@@ -3,46 +3,53 @@ FROM debian:bookworm-slim
 # Enable 32-bit architecture (required by Wine)
 RUN dpkg --add-architecture i386
 
-# Install Wine and minimal dependencies
+# Install WineHQ development branch (newer Wine = better .NET/WPF support)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wine \
-    wine32 \
-    wine64 \
+    gnupg2 \
+    software-properties-common \
+    wget \
+    ca-certificates \
     xvfb \
     xauth \
     cabextract \
-    wget \
-    ca-certificates \
+    imagemagick \
+    p7zip-full \
+    && wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
+    && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" \
+       > /etc/apt/sources.list.d/winehq.list \
+    && apt-get update \
+    && apt-get install -y --install-recommends winehq-devel \
     && rm -rf /var/lib/apt/lists/*
 
-# Download wine-mono 7.4.0 (required by Wine 8.0 for .NET support)
-RUN mkdir -p /usr/share/wine/mono \
-    && wget -O /usr/share/wine/mono/wine-mono-7.4.0-x86.msi \
-    https://dl.winehq.org/wine/wine-mono/7.4.0/wine-mono-7.4.0-x86.msi
+# Install latest winetricks
+RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+    && chmod +x /usr/local/bin/winetricks
 
 # Create a non-root user to run Wine
 RUN useradd -m -s /bin/bash ninjatrader
 USER ninjatrader
 WORKDIR /home/ninjatrader
 
-ENV WINEDEBUG=-all
 ENV DISPLAY=:99
 ENV WINEPREFIX=/home/ninjatrader/.wine
+ENV WINEDLLOVERRIDES="mscoree=;mshtml="
 
-# Initialize Wine prefix
-RUN xvfb-run wineboot --init && wineserver --wait
+# Initialize Wine prefix (64-bit) — skip mono/gecko install prompts
+RUN xvfb-run bash -c 'wineboot --init 2>&1; wineserver --wait'
 
-# Fake .NET 4.8 registry entry so NinjaTrader's launch condition is satisfied
-RUN xvfb-run wine reg add \
-    "HKLM\\SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full" \
-    /v Release /t REG_DWORD /d 528040 /f && wineserver --wait
+# Re-enable mscoree for .NET installation
+ENV WINEDLLOVERRIDES=""
+
+# Install .NET Framework 4.8 via winetricks (required by NinjaTrader)
+# This takes a while — it downloads and installs .NET components sequentially
+RUN rm -f /tmp/.X99-lock && xvfb-run winetricks -q dotnet48 && wineserver --wait
 
 # Copy the installer
 COPY --chown=ninjatrader:ninjatrader NinjaTrader.Install.msi .
 
 # Install NinjaTrader - the installer hangs on WebView2 download (not needed),
 # so we wait for NinjaTrader.exe to appear then kill the installer
-RUN xvfb-run bash -c ' \
+RUN rm -f /tmp/.X99-lock && xvfb-run bash -c ' \
     msiexec /i NinjaTrader.Install.msi /qn /norestart & \
     for i in $(seq 1 120); do \
         if [ -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe" ]; then \
@@ -57,4 +64,10 @@ RUN test -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe
 # Clean up installer
 RUN rm -f NinjaTrader.Install.msi
 
-CMD ["xvfb-run", "wine", "/home/ninjatrader/.wine/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe"]
+# Copy entrypoint script
+COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
+
+# Screenshots are saved here — mount a volume to access them on the host
+VOLUME /home/ninjatrader/screenshots
+
+ENTRYPOINT ["/bin/bash", "/home/ninjatrader/entrypoint.sh"]
