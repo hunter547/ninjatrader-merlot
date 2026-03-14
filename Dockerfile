@@ -40,9 +40,9 @@ RUN xvfb-run bash -c 'wineboot --init 2>&1; wineserver --wait'
 # Re-enable mscoree for .NET installation
 ENV WINEDLLOVERRIDES=""
 
-# Install .NET Framework 4.8 via winetricks (required by NinjaTrader)
+# Install .NET Framework 4.8 and core Microsoft fonts (Arial required by WPF PasswordBox)
 # This takes a while — it downloads and installs .NET components sequentially
-RUN rm -f /tmp/.X99-lock && xvfb-run winetricks -q dotnet48 && wineserver --wait
+RUN rm -f /tmp/.X99-lock && xvfb-run winetricks -q dotnet48 corefonts && wineserver --wait
 
 # Copy the installer
 COPY --chown=ninjatrader:ninjatrader NinjaTrader.Install.msi .
@@ -64,10 +64,23 @@ RUN test -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe
 # Clean up installer
 RUN rm -f NinjaTrader.Install.msi
 
+# Install VNC and noVNC for remote GUI access (after NinjaTrader to preserve cache)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xdotool \
+    x11vnc \
+    novnc \
+    websockify \
+    && rm -rf /var/lib/apt/lists/*
+USER ninjatrader
+
 # Copy entrypoint script
 COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
 
 # Screenshots are saved here — mount a volume to access them on the host
 VOLUME /home/ninjatrader/screenshots
+
+# noVNC web interface on 6080, VNC on 5900
+EXPOSE 6080 5900
 
 ENTRYPOINT ["/bin/bash", "/home/ninjatrader/entrypoint.sh"]
