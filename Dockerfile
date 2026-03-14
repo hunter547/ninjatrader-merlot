@@ -64,6 +64,14 @@ RUN test -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe
 # Clean up installer
 RUN rm -f NinjaTrader.Install.msi
 
+# Replace Wine's stub websocket.dll with native Windows version
+# (Wine doesn't implement WebSocket Protocol Component API, which .NET Framework requires)
+COPY DLLs/websocket64.dll $WINEPREFIX/drive_c/windows/system32/websocket.dll
+COPY DLLs/websocket32.dll $WINEPREFIX/drive_c/windows/syswow64/websocket.dll
+RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
+    wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v websocket /t REG_SZ /d "native,builtin" /f 2>/dev/null; \
+    wineserver --wait'
+
 # Install VNC and noVNC for remote GUI access (after NinjaTrader to preserve cache)
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
