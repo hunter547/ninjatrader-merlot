@@ -1,0 +1,13 @@
+services:
+  ninjatrader:
+    build: .
+    container_name: ninjatrader-merlot
+    ports:
+      - "6080:6080"
+      - "5900:5900"
+    volumes:
+      - "${NT_CONFIG_PATH:-~/Documents/NinjaTrader 8/Config.xml}:/tmp/host_config.xml:ro"
+      - ./screenshots:/home/ninjatrader/screenshots
+    environment:
+      - VNC_PASSWORD=${VNC_PASSWORD:-}
+      - HOST_MACHINE_GUID=${HOST_MACHINE_GUID:-}

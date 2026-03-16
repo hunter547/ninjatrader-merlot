@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cabextract \
     imagemagick \
     p7zip-full \
+    x11vnc \
+    novnc \
+    websockify \
     && wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" \
        > /etc/apt/sources.list.d/winehq.list \
@@ -44,7 +47,15 @@ ENV WINEDLLOVERRIDES=""
 # This takes a while — it downloads and installs .NET components sequentially
 RUN rm -f /tmp/.X99-lock && xvfb-run winetricks -q dotnet48 corefonts && wineserver --wait
 
-# Copy the installer
+# Replace Wine's stub websocket.dll with native Windows version
+# (Wine doesn't implement WebSocket Protocol Component API, which .NET Framework requires)
+COPY DLLs/websocket64.dll $WINEPREFIX/drive_c/windows/system32/websocket.dll
+COPY DLLs/websocket32.dll $WINEPREFIX/drive_c/windows/syswow64/websocket.dll
+RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
+    wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v websocket /t REG_SZ /d "native,builtin" /f 2>/dev/null; \
+    wineserver --wait'
+
+# Copy and install NinjaTrader
 COPY --chown=ninjatrader:ninjatrader NinjaTrader.Install.msi .
 
 # Install NinjaTrader - the installer hangs on WebView2 download (not needed),
@@ -63,24 +74,6 @@ RUN test -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe
 
 # Clean up installer
 RUN rm -f NinjaTrader.Install.msi
-
-# Replace Wine's stub websocket.dll with native Windows version
-# (Wine doesn't implement WebSocket Protocol Component API, which .NET Framework requires)
-COPY DLLs/websocket64.dll $WINEPREFIX/drive_c/windows/system32/websocket.dll
-COPY DLLs/websocket32.dll $WINEPREFIX/drive_c/windows/syswow64/websocket.dll
-RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
-    wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v websocket /t REG_SZ /d "native,builtin" /f 2>/dev/null; \
-    wineserver --wait'
-
-# Install VNC and noVNC for remote GUI access (after NinjaTrader to preserve cache)
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    xdotool \
-    x11vnc \
-    novnc \
-    websockify \
-    && rm -rf /var/lib/apt/lists/*
-USER ninjatrader
 
 # Copy entrypoint script
 COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
