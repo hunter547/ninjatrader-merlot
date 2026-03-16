@@ -30,9 +30,9 @@ sleep 1
 
 # Start VNC server (no password by default, use VNC_PASSWORD env to set one)
 if [ -n "$VNC_PASSWORD" ]; then
-    x11vnc -display :99 -forever -shared -rfbport 5900 -passwd "$VNC_PASSWORD" &
+    x11vnc -display :99 -forever -shared -rfbport 5900 -noxdamage -passwd "$VNC_PASSWORD" &
 else
-    x11vnc -display :99 -forever -shared -rfbport 5900 -nopw &
+    x11vnc -display :99 -forever -shared -rfbport 5900 -noxdamage -nopw &
 fi
 sleep 1
 
@@ -46,6 +46,11 @@ echo "============================================"
 echo " noVNC:  http://localhost:6080/vnc.html"
 echo " VNC:    localhost:5900"
 echo "============================================"
+
+# Start window manager and compositor
+openbox &
+picom --backend xrender --no-vsync --no-fading-openclose &
+sleep 1
 
 # Launch NinjaTrader
 wine "$NT_EXE" 2>/tmp/wine_err.log &

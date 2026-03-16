@@ -6,7 +6,10 @@ services:
       - "6080:6080"
       - "5900:5900"
     volumes:
-      - "${NT_CONFIG_PATH:-~/Documents/NinjaTrader 8/Config.xml}:/tmp/host_config.xml:ro"
+      - type: bind
+        source: "${NT_CONFIG_PATH}"
+        target: /tmp/host_config.xml
+        read_only: true
       - ./screenshots:/home/ninjatrader/screenshots
     environment:
       - VNC_PASSWORD=${VNC_PASSWORD:-}
