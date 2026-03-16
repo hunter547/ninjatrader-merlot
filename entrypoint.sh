@@ -49,6 +49,9 @@ echo "============================================"
 
 # Start window manager and compositor
 openbox &
+sleep 1
+convert -size 1x1 xc:black /tmp/black.png
+feh --bg-fill /tmp/black.png
 picom --backend xrender --no-vsync --no-fading-openclose &
 sleep 1
 
