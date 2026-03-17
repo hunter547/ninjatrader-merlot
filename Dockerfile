@@ -17,11 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     novnc \
     websockify \
-    openbox \
-    picom \
+    xcompmgr \
     x11-xserver-utils \
-    feh \
-    && wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
+    feh
+
+# Install wine
+RUN wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" \
        > /etc/apt/sources.list.d/winehq.list \
     && apt-get update \
@@ -59,7 +60,7 @@ RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
     wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v websocket /t REG_SZ /d "native,builtin" /f 2>/dev/null; \
     wineserver --wait'
 
-# Copy and install NinjaTrader
+# Copy NinjaTrader
 COPY --chown=ninjatrader:ninjatrader NinjaTrader.Install.msi .
 
 # Install NinjaTrader - the installer hangs on WebView2 download (not needed),
