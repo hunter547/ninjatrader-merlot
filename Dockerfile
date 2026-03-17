@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     novnc \
     websockify \
     xcompmgr \
+    openbox \
     x11-xserver-utils \
     feh
 

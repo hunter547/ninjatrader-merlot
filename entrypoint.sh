@@ -47,7 +47,9 @@ echo " noVNC:  http://localhost:6080/vnc.html"
 echo " VNC:    localhost:5900"
 echo "============================================"
 
-# Start compositor (fixes chart rendering)
+# Start window manager and compositor (fixes chart rendering + window stacking)
+openbox &
+sleep 1
 convert -size 1x1 xc:black /tmp/black.png
 feh --bg-fill /tmp/black.png
 xcompmgr &
