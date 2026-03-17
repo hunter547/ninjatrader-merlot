@@ -7,6 +7,13 @@ NT_CONFIG="$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8/Config.
 
 mkdir -p "$SCREENSHOT_DIR"
 
+# Seed NinjaTrader 8 documents directory if the bind mount is empty (first run, or dev deletes host machine mount)
+NT_DOCS="$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8"
+if [ -z "$(ls -A "$NT_DOCS" 2>/dev/null)" ]; then
+    echo "First run detected — seeding NinjaTrader 8 documents from defaults..."
+    cp -a /home/ninjatrader/NinjaTrader8-default/. "$NT_DOCS/"
+fi
+
 # Copy host Config.xml if mounted
 if [ -f /tmp/host_config.xml ]; then
     cp /tmp/host_config.xml "$NT_CONFIG"

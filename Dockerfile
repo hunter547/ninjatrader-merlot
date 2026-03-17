@@ -81,6 +81,15 @@ RUN test -f "$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe
 # Clean up installer
 RUN rm -f NinjaTrader.Install.msi
 
+# Create default workspace files so NinjaTrader has a valid workspace on first launch
+RUN echo '<?xml version="1.0" encoding="utf-8"?>\n<NinjaTrader>\n  <ActiveWorkspace>Default</ActiveWorkspace>\n  <OpenWorkspaces>Default<OpenWorkspace>Default</OpenWorkspace></OpenWorkspaces>\n</NinjaTrader>' \
+    > "$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8/workspaces/_Workspaces.xml" \
+    && echo '<?xml version="1.0" encoding="utf-8"?>\n<NinjaTrader />' \
+    > "$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8/workspaces/Default.xml"
+
+# Preserve default NinjaTrader documents so they can seed an empty bind mount
+RUN cp -a "$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8" /home/ninjatrader/NinjaTrader8-default
+
 # Copy entrypoint script
 COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
 
