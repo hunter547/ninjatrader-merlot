@@ -90,6 +90,17 @@ RUN echo '<?xml version="1.0" encoding="utf-8"?>\n<NinjaTrader>\n  <ActiveWorksp
 # Preserve default NinjaTrader documents so they can seed an empty bind mount
 RUN cp -a "$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8" /home/ninjatrader/NinjaTrader8-default
 
+# Compile AutoLogin helper for automated UI login via WPF UI Automation
+COPY --chown=ninjatrader:ninjatrader AutoLogin.cs .
+RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
+    wine "C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe" \
+        /out:"C:\\AutoLogin.exe" \
+        /reference:"C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\WPF\\UIAutomationClient.dll" \
+        /reference:"C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\WPF\\UIAutomationTypes.dll" \
+        "Z:\\home\\ninjatrader\\AutoLogin.cs" 2>/dev/null; \
+    wineserver --wait'
+RUN test -f "$WINEPREFIX/drive_c/AutoLogin.exe"
+
 # Copy entrypoint script
 COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
 

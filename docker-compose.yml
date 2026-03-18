@@ -16,6 +16,8 @@ services:
     environment:
       - VNC_PASSWORD=${VNC_PASSWORD:-}
       - HOST_MACHINE_GUID=${HOST_MACHINE_GUID:-}
+      - NT_USERNAME=${NT_USERNAME:-}
+      - NT_PASSWORD=${NT_PASSWORD:-}
 
   ninjatrader-auth:
     build:

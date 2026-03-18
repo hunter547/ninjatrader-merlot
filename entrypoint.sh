@@ -70,7 +70,13 @@ sleep 1
 # Launch NinjaTrader
 wine "$NT_EXE" 2>/tmp/wine_err.log &
 
-echo "NinjaTrader launched. Open browser to log in."
+# Auto-login via WPF UI Automation if credentials are provided
+if [ -n "$NT_USERNAME" ] && [ -n "$NT_PASSWORD" ]; then
+    echo "Starting AutoLogin (waiting for login window)..."
+    wine "$WINEPREFIX/drive_c/AutoLogin.exe" "$NT_USERNAME" "$NT_PASSWORD" 2>/dev/null &
+else
+    echo "NinjaTrader launched. Open browser to log in."
+fi
 
 # Keep container running
 wait
