@@ -32,8 +32,13 @@ if [ -n "$HOST_MACHINE_GUID" ]; then
 fi
 
 # Start Xvfb
+rm -f /tmp/.X99-lock
 Xvfb :99 -screen 0 1280x1024x24 &
-sleep 1
+# Wait for display to be ready
+for i in $(seq 1 10); do
+    if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
+    sleep 1
+done
 
 # Start VNC server (no password by default, use VNC_PASSWORD env to set one)
 if [ -n "$VNC_PASSWORD" ]; then

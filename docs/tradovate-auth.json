@@ -1,0 +1,8 @@
+{
+  "endpoint": "https://live.tradovateapi.com/v1/auth/accesstokenrequest",
+  "renewEndpoint": "https://live.tradovateapi.com/v1/auth/renewaccesstoken",
+  "appId": "NinjaTrader8",
+  "appVersion": "8.1.6.3",
+  "cid": "543",
+  "sec": "ee3eb579-765f-4456-8bbe-5e393241ad20"
+}
