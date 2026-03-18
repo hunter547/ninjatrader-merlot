@@ -19,6 +19,29 @@ services:
       - NT_USERNAME=${NT_USERNAME:-}
       - NT_PASSWORD=${NT_PASSWORD:-}
 
+  ninjatrader-native:
+    build: .
+    image: ninjatrader-merlot
+    container_name: ninjatrader-merlot-native
+    volumes:
+      - type: bind
+        source: "${NT_CONFIG_PATH}"
+        target: /tmp/host_config.xml
+        read_only: true
+      - ./screenshots:/home/ninjatrader/screenshots
+      - ./ninjatrader-data:/home/ninjatrader/.wine/drive_c/users/ninjatrader/Documents/NinjaTrader 8
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ${XAUTHORITY:-~/.Xauthority}:/home/ninjatrader/.Xauthority:ro
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - XAUTHORITY=/home/ninjatrader/.Xauthority
+      - HOST_MACHINE_GUID=${HOST_MACHINE_GUID:-}
+      - NT_USERNAME=${NT_USERNAME:-}
+      - NT_PASSWORD=${NT_PASSWORD:-}
+      - NATIVE_DISPLAY=1
+    profiles:
+      - native
+
   ninjatrader-auth:
     build:
       context: .
