@@ -58,17 +58,131 @@ if [ -n "$NT_USERNAME" ] && [ -n "$NT_PASSWORD" ]; then
         echo "Generated MachineId2: ${DEVICE_ID}"
     fi
 
-    # Call Tradovate API
+    # Extract cid/sec dynamically from NinjaTrader's own auth request
+    # by intercepting TLS traffic during a UI-driven login
+    # Disable set -e for this block — many commands may return non-zero
+    set +e
+    echo "Extracting auth credentials from NinjaTrader..."
+    SSLKEY_FILE="/tmp/sslkeys.log"
+    PCAP_FILE="/tmp/auth_capture.pcap"
+
+    # Launch NinjaTrader with SSLKEYLOGFILE to dump TLS session keys
+    SSLKEYLOGFILE="$SSLKEY_FILE" wine "$NT_EXE" 2>/tmp/wine_err.log &
+    NT_PID=$!
+
+    # Start packet capture (runs as current user, needs cap_net_raw or tcpdump suid)
+    tcpdump -i any -n port 443 -w "$PCAP_FILE" 2>/dev/null &
+    TCPDUMP_PID=$!
+
+    # Use AutoLogin to fill in credentials and click Login
+    wine "$WINEPREFIX/drive_c/AutoLogin.exe" "$NT_USERNAME" "$NT_PASSWORD" 2>/dev/null &
+    AUTOLOGIN_PID=$!
+
+    # Wait for AutoLogin to finish (it exits after clicking Login + Launch)
+    wait $AUTOLOGIN_PID 2>/dev/null
+
+    # Give NinjaTrader a moment to complete the auth request
+    sleep 5
+
+    # Stop packet capture
+    kill $TCPDUMP_PID 2>/dev/null || true
+    wait $TCPDUMP_PID 2>/dev/null || true
+
+    # Stop NinjaTrader — we'll relaunch it later with cached tokens
+    wine taskkill /F /IM NinjaTrader.exe 2>/dev/null || true
+    wineserver --wait || true
+    wait $NT_PID 2>/dev/null || true
+
+    # Decrypt captured traffic and extract the auth request
+    AUTH_REQUEST_BODY=""
+    AUTH_HTTP_JSON=""
+    if [ -f "$PCAP_FILE" ] && [ -f "$SSLKEY_FILE" ]; then
+        AUTH_FULL_JSON=$(tshark -r "$PCAP_FILE" \
+            -o "tls.keylog_file:$SSLKEY_FILE" \
+            -Y "http.request.uri contains \"accesstokenrequest\"" \
+            -T json 2>/dev/null)
+
+        AUTH_REQUEST_BODY=$(echo "$AUTH_FULL_JSON" \
+            | jq -r '.[0]._source.layers.json["json.object"] // empty' 2>/dev/null)
+        AUTH_HTTP_JSON=$(echo "$AUTH_FULL_JSON" \
+            | jq '.[0]._source.layers.http // empty' 2>/dev/null)
+    fi
+
+    if [ -n "$AUTH_REQUEST_BODY" ]; then
+        # Parse all fields from the captured request
+        NT_CID=$(echo "$AUTH_REQUEST_BODY" | jq -r '.cid // empty' 2>/dev/null)
+        NT_SEC=$(echo "$AUTH_REQUEST_BODY" | jq -r '.sec // empty' 2>/dev/null)
+        NT_APP_ID=$(echo "$AUTH_REQUEST_BODY" | jq -r '.appId // empty' 2>/dev/null)
+        NT_APP_VERSION=$(echo "$AUTH_REQUEST_BODY" | jq -r '.appVersion // empty' 2>/dev/null)
+        DEVICE_ID=$(echo "$AUTH_REQUEST_BODY" | jq -r '.deviceId // empty' 2>/dev/null)
+        echo "Extracted auth credentials: cid=${NT_CID} appId=${NT_APP_ID} appVersion=${NT_APP_VERSION} deviceId=${DEVICE_ID}"
+
+        # Write the full curl command to a script file (mounted volume for host access)
+        CURL_SCRIPT="/home/ninjatrader/auth/tradovate_auth_curl.sh"
+        mkdir -p /home/ninjatrader/auth
+        REQUEST_URI=$(echo "$AUTH_HTTP_JSON" | jq -r '.["http.request.full_uri"] // "https://live.tradovateapi.com/v1/auth/accesstokenrequest"' 2>/dev/null)
+        CONTENT_TYPE=$(echo "$AUTH_HTTP_JSON" | jq -r '.["http.content_type"] // "application/json; charset=utf-8"' 2>/dev/null)
+
+        cat > "$CURL_SCRIPT" << 'CURLEOF'
+#!/bin/bash
+# NinjaTrader Tradovate auth request — captured via TLS interception
+#
+# This is the exact request NinjaTrader sends to authenticate.
+# Set NT_USERNAME and NT_PASSWORD env vars before running.
+
+curl -s -X POST '__REQUEST_URI__' \
+  -H 'Content-Type: __CONTENT_TYPE__' \
+  -H 'Expect: 100-continue' \
+  -A '' \
+  -d "{
+    \"appId\": \"__NT_APP_ID__\",
+    \"appVersion\": \"__NT_APP_VERSION__\",
+    \"cid\": \"__NT_CID__\",
+    \"deviceId\": \"__DEVICE_ID__\",
+    \"name\": \"${NT_USERNAME}\",
+    \"password\": \"${NT_PASSWORD}\",
+    \"sec\": \"__NT_SEC__\"
+  }"
+CURLEOF
+        # Replace placeholders with captured values
+        sed -i "s|__REQUEST_URI__|${REQUEST_URI}|g" "$CURL_SCRIPT"
+        sed -i "s|__CONTENT_TYPE__|${CONTENT_TYPE}|g" "$CURL_SCRIPT"
+        sed -i "s|__NT_APP_ID__|${NT_APP_ID}|g" "$CURL_SCRIPT"
+        sed -i "s|__NT_APP_VERSION__|${NT_APP_VERSION}|g" "$CURL_SCRIPT"
+        sed -i "s|__NT_CID__|${NT_CID}|g" "$CURL_SCRIPT"
+        sed -i "s|__DEVICE_ID__|${DEVICE_ID}|g" "$CURL_SCRIPT"
+        sed -i "s|__NT_SEC__|${NT_SEC}|g" "$CURL_SCRIPT"
+        chmod +x "$CURL_SCRIPT"
+        echo "Curl command written to $CURL_SCRIPT (mount /home/ninjatrader/auth to access on host)"
+    fi
+
+    # Fall back to empty check — if any value missing, extraction failed
+    if [ -z "$NT_CID" ] || [ -z "$NT_SEC" ]; then
+        echo "WARNING: Could not extract auth credentials from traffic capture."
+        echo "Using known fallback values. These may be outdated if NinjaTrader was updated."
+        NT_CID="${NT_CID:-543}"
+        NT_SEC="${NT_SEC:-ee3eb579-765f-4456-8bbe-5e393241ad20}"
+        NT_APP_ID="${NT_APP_ID:-NinjaTrader8}"
+        NT_APP_VERSION="${NT_APP_VERSION:-8.1.6.3}"
+    fi
+
+    # Clean up capture files
+    rm -f "$PCAP_FILE" "$SSLKEY_FILE"
+    set -e
+
+    # Call Tradovate API with extracted credentials
     AUTH_RESPONSE=$(curl -s -X POST "https://live.tradovateapi.com/v1/auth/accesstokenrequest" \
-        -H "Content-Type: application/json" \
+        -H "Content-Type: application/json; charset=utf-8" \
+        -H "Expect: 100-continue" \
+        -A "" \
         -d "{
-            \"appId\": \"NinjaTrader8\",
-            \"appVersion\": \"8.1.6.3\",
-            \"cid\": \"543\",
+            \"appId\": \"${NT_APP_ID}\",
+            \"appVersion\": \"${NT_APP_VERSION}\",
+            \"cid\": \"${NT_CID}\",
             \"deviceId\": \"${DEVICE_ID}\",
             \"name\": \"${NT_USERNAME}\",
             \"password\": \"${NT_PASSWORD}\",
-            \"sec\": \"ee3eb579-765f-4456-8bbe-5e393241ad20\"
+            \"sec\": \"${NT_SEC}\"
         }")
 
     # Check for p-ticket (rate limit)
@@ -83,15 +197,17 @@ if [ -n "$NT_USERNAME" ] && [ -n "$NT_PASSWORD" ]; then
             echo "Rate limited. Waiting ${P_TIME}s..."
             sleep "$P_TIME"
             AUTH_RESPONSE=$(curl -s -X POST "https://live.tradovateapi.com/v1/auth/accesstokenrequest" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json; charset=utf-8" \
+        -H "Expect: 100-continue" \
+        -A "" \
                 -d "{
-                    \"appId\": \"NinjaTrader8\",
-                    \"appVersion\": \"8.1.6.3\",
-                    \"cid\": \"543\",
+                    \"appId\": \"${NT_APP_ID}\",
+                    \"appVersion\": \"${NT_APP_VERSION}\",
+                    \"cid\": \"${NT_CID}\",
                     \"deviceId\": \"${DEVICE_ID}\",
                     \"name\": \"${NT_USERNAME}\",
                     \"password\": \"${NT_PASSWORD}\",
-                    \"sec\": \"ee3eb579-765f-4456-8bbe-5e393241ad20\",
+                    \"sec\": \"${NT_SEC}\",
                     \"p-ticket\": \"${P_TICKET}\"
                 }")
         fi

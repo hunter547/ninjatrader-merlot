@@ -21,7 +21,7 @@ services:
 
   ninjatrader-native:
     build: .
-    image: ninjatrader-merlot
+    image: ninjatrader-trixie-merlot
     container_name: ninjatrader-merlot-native
     volumes:
       - type: bind
@@ -39,8 +39,6 @@ services:
       - NT_USERNAME=${NT_USERNAME:-}
       - NT_PASSWORD=${NT_PASSWORD:-}
       - NATIVE_DISPLAY=1
-    profiles:
-      - native
 
   ninjatrader-auth:
     build:
@@ -51,9 +49,11 @@ services:
     ports:
       - "6081:6080"
       - "5901:5900"
+    cap_add:
+      - NET_RAW
+    volumes:
+      - ./auth:/home/ninjatrader/auth
     environment:
       - VNC_PASSWORD=${VNC_PASSWORD:-}
       - NT_USERNAME=${NT_USERNAME:-}
       - NT_PASSWORD=${NT_PASSWORD:-}
-    profiles:
-      - auth

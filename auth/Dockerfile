@@ -12,12 +12,13 @@
 #     -v ./ninjatrader-data:/home/ninjatrader/.wine/drive_c/users/ninjatrader/Documents/NinjaTrader\ 8 \
 #     ninjatrader-auth
 
-FROM ninjatrader-merlot
+FROM ninjatrader-trixie-merlot
 
 USER root
 RUN apt-get update -o Acquire::AllowInsecureRepositories=true \
-    && apt-get install -y --allow-unauthenticated --no-install-recommends curl jq \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --allow-unauthenticated --no-install-recommends curl jq tcpdump tshark libcap2-bin \
+    && rm -rf /var/lib/apt/lists/* \
+    && setcap cap_net_raw+ep /usr/bin/tcpdump
 USER ninjatrader
 
 # Compile NTEncrypt helper for token encryption via NinjaTrader.Core.dll
