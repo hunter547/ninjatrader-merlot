@@ -3,3 +3,4 @@ screenshots
 .env
 ninjatrader-data
 auth/*.sh
+!auth/entrypoint.sh
