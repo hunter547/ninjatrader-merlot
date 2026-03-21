@@ -1,15 +1,13 @@
 ########################################
 # Stage 1: Build everything
 ########################################
-FROM debian:bookworm-slim AS builder
+FROM debian:trixie-slim AS builder
 
 # Enable 32-bit architecture (required by Wine)
 RUN dpkg --add-architecture i386
 
-# Install dependencies
+# Install Wine 10.0 from Debian trixie repos + build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gnupg2 \
-    software-properties-common \
     wget \
     ca-certificates \
     xvfb \
@@ -20,17 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     novnc \
     websockify \
-    xcompmgr \
     openbox \
     x11-xserver-utils \
-    feh
-
-# Install WineHQ devel (stable 11.0 crashes NinjaTrader with heap corruption)
-RUN wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
-    && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" \
-       > /etc/apt/sources.list.d/winehq.list \
-    && apt-get update \
-    && apt-get install -y --install-recommends winehq-devel \
+    feh \
+    wine \
+    wine64 \
+    wine32:i386 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install latest winetricks
@@ -62,6 +55,7 @@ COPY DLLs/websocket64.dll $WINEPREFIX/drive_c/windows/system32/websocket.dll
 COPY DLLs/websocket32.dll $WINEPREFIX/drive_c/windows/syswow64/websocket.dll
 RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
     wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v websocket /t REG_SZ /d "native,builtin" /f 2>/dev/null; \
+    wine reg add "HKCU\\Software\\Wine\\Direct3D" /v renderer /t REG_SZ /d gdi /f 2>/dev/null; \
     wineserver --wait'
 
 # Copy NinjaTrader
@@ -92,7 +86,7 @@ RUN rm -f /tmp/.X99-lock && xvfb-run bash -c '\
     wineserver --wait'
 RUN test -f "$WINEPREFIX/drive_c/AutoLogin.exe"
 
-# Clean up everything we don't need at runtime
+# Clean up build artifacts
 RUN rm -f NinjaTrader.Install.msi \
     && rm -rf /home/ninjatrader/.cache/winetricks/* \
     && rm -rf "$WINEPREFIX/drive_c/windows/Installer/"* \
@@ -108,17 +102,15 @@ RUN echo '<?xml version="1.0" encoding="utf-8"?>\n<NinjaTrader>\n  <ActiveWorksp
 RUN cp -a "$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8" /home/ninjatrader/NinjaTrader8-default
 
 ########################################
-# Stage 2: Fresh image with only runtime deps
+# Stage 2: Clean runtime image
 ########################################
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Enable 32-bit architecture (required by Wine)
 RUN dpkg --add-architecture i386
 
-# Install only runtime dependencies (no gnupg2, software-properties-common, cpp)
+# Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    ca-certificates \
     xvfb \
     xauth \
     cabextract \
@@ -127,21 +119,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     novnc \
     websockify \
-    xcompmgr \
     openbox \
     x11-xserver-utils \
-    feh
-
-# Install WineHQ devel in runtime stage too (needed for wine binaries + libs)
-RUN wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
-    && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" \
-       > /etc/apt/sources.list.d/winehq.list \
-    && apt-get update \
-    && apt-get install -y --install-recommends winehq-devel \
-    && apt-get purge -y --auto-remove wget gnupg \
+    feh \
+    wine \
+    wine64 \
+    wine32:i386 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install winetricks (needed at runtime for potential verb calls)
+# Copy winetricks from builder
 COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
 
 # Recreate the user with same UID
@@ -152,6 +138,7 @@ WORKDIR /home/ninjatrader
 ENV DISPLAY=:99
 ENV WINEPREFIX=/home/ninjatrader/.wine
 ENV WINEDLLOVERRIDES=""
+ENV LIBGL_ALWAYS_SOFTWARE=1
 
 # Copy the fully built Wine prefix and NinjaTrader default docs from builder
 COPY --from=builder --chown=ninjatrader:ninjatrader /home/ninjatrader/.wine /home/ninjatrader/.wine

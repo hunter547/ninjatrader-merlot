@@ -65,8 +65,16 @@ class AutoLogin
                 object valPattern;
                 if (usernameBox.TryGetCurrentPattern(ValuePattern.Pattern, out valPattern))
                 {
-                    ((ValuePattern)valPattern).SetValue(username);
-                    Console.WriteLine("Username set");
+                    string currentValue = ((ValuePattern)valPattern).Current.Value;
+                    if (string.IsNullOrEmpty(currentValue))
+                    {
+                        ((ValuePattern)valPattern).SetValue(username);
+                        Console.WriteLine("Username was empty — set to provided value");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Username already populated: " + currentValue);
+                    }
                 }
             }
 

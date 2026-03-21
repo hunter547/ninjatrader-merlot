@@ -76,7 +76,7 @@ else
     sleep 1
     convert -size 1x1 xc:black /tmp/black.png
     feh --bg-fill /tmp/black.png
-    xcompmgr &
+    command -v xcompmgr >/dev/null 2>&1 && xcompmgr &
     sleep 1
 fi
 
