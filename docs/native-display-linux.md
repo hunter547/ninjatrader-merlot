@@ -55,7 +55,7 @@ NinjaTrader windows will appear directly on your desktop as individual windows m
 - Check logs: `docker logs ninjatrader-merlot-native`
 
 ### Window flickering
-If NinjaTrader windows flicker, try adding `LIBGL_ALWAYS_SOFTWARE=1` to the environment section in `docker-compose.yml` under `ninjatrader-native`.
+The NinjaTrader Control Center may flicker on XWayland until you click any menu dropdown (e.g. "New" or "Tools"). This is a Wine rendering quirk on XWayland — the WPF rendering surface doesn't fully initialize until a menu interaction occurs. It's cosmetic only and does not affect functionality. Clicking any dropdown menu once will stop the flickering for the rest of the session.
 
 ### Docker credential errors
 If you see `docker-credential-desktop` errors after switching from Docker Desktop, clear the credential store:
