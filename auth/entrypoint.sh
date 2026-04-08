@@ -252,43 +252,4 @@ CURLEOF
     fi
 fi
 
-# Start VNC server (no password by default, use VNC_PASSWORD env to set one)
-if [ -n "$VNC_PASSWORD" ]; then
-    x11vnc -display :99 -forever -shared -rfbport 5900 -noxdamage -passwd "$VNC_PASSWORD" &
-else
-    x11vnc -display :99 -forever -shared -rfbport 5900 -noxdamage -nopw &
-fi
-sleep 1
-
-# Start noVNC (web-based VNC client)
-websockify --web /usr/share/novnc 6080 localhost:5900 &
-sleep 1
-
-echo "============================================"
-echo " NinjaTrader Merlot (Auth)"
-echo "============================================"
-echo " noVNC:  http://localhost:6080/vnc.html"
-echo " VNC:    localhost:5900"
-echo "============================================"
-
-# Start window manager and compositor (fixes chart rendering + window stacking)
-openbox &
-sleep 1
-convert -size 1x1 xc:black /tmp/black.png
-feh --bg-fill /tmp/black.png
-xcompmgr &
-sleep 1
-
-# Launch NinjaTrader
-wine "$NT_EXE" 2>/tmp/wine_err.log &
-
-# Auto-login via UI Automation if credentials are provided
-if [ -n "$NT_USERNAME" ] && [ -n "$NT_PASSWORD" ]; then
-    echo "Starting AutoLogin (waiting for login window)..."
-    wine "$WINEPREFIX/drive_c/AutoLogin.exe" "$NT_USERNAME" "$NT_PASSWORD" 2>/dev/null &
-fi
-
-echo "NinjaTrader launched."
-
-# Keep container running
-wait
+echo "Auth extraction complete."

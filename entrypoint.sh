@@ -11,7 +11,11 @@ mkdir -p "$SCREENSHOT_DIR"
 NT_DOCS="$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8"
 if [ -z "$(ls -A "$NT_DOCS" 2>/dev/null)" ]; then
     echo "First run detected — seeding NinjaTrader 8 documents from defaults..."
-    cp -a /home/ninjatrader/NinjaTrader8-default/. "$NT_DOCS/"
+    if ! cp -a /home/ninjatrader/NinjaTrader8-default/. "$NT_DOCS/" 2>/dev/null; then
+        echo "ERROR: Cannot write to $NT_DOCS — directory is likely owned by root."
+        echo "Fix with: sudo chown -R \$(id -u):\$(id -g) ./ninjatrader-data/"
+        exit 1
+    fi
 fi
 
 # Copy host Config.xml if mounted
@@ -82,6 +86,7 @@ fi
 
 # Launch NinjaTrader
 wine "$NT_EXE" 2>/tmp/wine_err.log &
+NT_PID=$!
 
 # Auto-login via WPF UI Automation if credentials are provided
 if [ -n "$NT_USERNAME" ] && [ -n "$NT_PASSWORD" ]; then
@@ -91,5 +96,6 @@ else
     echo "NinjaTrader launched. Open browser to log in."
 fi
 
-# Keep container running
-wait
+# Wait for NinjaTrader to exit (e.g. Control Center closed), then stop the container
+wait $NT_PID 2>/dev/null
+echo "NinjaTrader exited. Shutting down."
