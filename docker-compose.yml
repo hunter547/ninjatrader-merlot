@@ -21,7 +21,7 @@ services:
 
   ninjatrader-native:
     build: .
-    image: ninjatrader-trixie-merlot
+    image: ninjatrader-merlot
     container_name: ninjatrader-merlot-native
     volumes:
       - type: bind
@@ -39,6 +39,30 @@ services:
       - NT_USERNAME=${NT_USERNAME:-}
       - NT_PASSWORD=${NT_PASSWORD:-}
       - NATIVE_DISPLAY=1
+
+  ninjatrader-mac:
+    # Pre-built image from GHCR — building locally on Apple Silicon doesn't work
+    # because Wine's 32-bit .NET installer crashes under both Rosetta (GDT) and
+    # QEMU (page size). The image is built on x86_64 in CI and pulled here.
+    # Runtime is fine: NinjaTrader is 64-bit only and runs through Rosetta.
+    image: ghcr.io/hunter547/ninjatrader-merlot:latest
+    platform: linux/amd64
+    container_name: ninjatrader-merlot-mac
+    ports:
+      - "6080:6080"
+      - "5900:5900"
+    volumes:
+      - type: bind
+        source: "${NT_CONFIG_PATH}"
+        target: /tmp/host_config.xml
+        read_only: true
+      - ./screenshots:/home/ninjatrader/screenshots
+      - ./ninjatrader-data:/home/ninjatrader/.wine/drive_c/users/ninjatrader/Documents/NinjaTrader 8
+    environment:
+      - VNC_PASSWORD=${VNC_PASSWORD:-}
+      - HOST_MACHINE_GUID=${HOST_MACHINE_GUID:-}
+      - NT_USERNAME=${NT_USERNAME:-}
+      - NT_PASSWORD=${NT_PASSWORD:-}
 
   ninjatrader-auth:
     build:

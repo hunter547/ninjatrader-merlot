@@ -1,4 +1,4 @@
-.PHONY: setup up up-native up-auth down
+.PHONY: setup up up-native up-mac up-auth down
 
 setup:
 	mkdir -p ninjatrader-data screenshots
@@ -8,6 +8,10 @@ up: setup
 
 up-native: setup
 	docker compose up -d ninjatrader-native
+
+up-mac: setup
+	docker compose pull ninjatrader-mac
+	docker compose up -d ninjatrader-mac
 
 up-auth: setup
 	docker compose up -d ninjatrader-auth
