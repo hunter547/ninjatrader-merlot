@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - Dockerfile
+      - Dockerfile.trixie
       - entrypoint.sh
       - AutoLogin.cs
       - DLLs/**
@@ -59,7 +60,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile.trixie
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
