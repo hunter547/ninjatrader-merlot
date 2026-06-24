@@ -107,7 +107,7 @@ COPY --chown=ninjatrader:ninjatrader entrypoint.sh .
 # Screenshots are saved here — mount a volume to access them on the host
 VOLUME /home/ninjatrader/screenshots
 
-# noVNC web interface on 6080, VNC on 5900
-EXPOSE 6080 5900
+# noVNC web interface on 6080, VNC on 5900, NinjaTraderBridge REST/SSE/WS API on 5000
+EXPOSE 6080 5900 5000
 
 ENTRYPOINT ["/bin/bash", "/home/ninjatrader/entrypoint.sh"]

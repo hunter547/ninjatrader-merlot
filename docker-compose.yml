@@ -6,6 +6,7 @@ services:
     ports:
       - "6080:6080"
       - "5900:5900"
+      - "5000:5000"
     volumes:
       - type: bind
         source: "${NT_CONFIG_PATH}"
@@ -23,6 +24,8 @@ services:
     build: .
     image: ninjatrader-trixie-merlot
     container_name: ninjatrader-merlot-native
+    ports:
+      - "5000:5000"
     volumes:
       - type: bind
         source: "${NT_CONFIG_PATH}"
