@@ -1,6 +1,8 @@
 .claude
-screenshots
 .env
-ninjatrader-data
+screenshots/*
+!screenshots/.gitkeep
+ninjatrader-data/*
+!ninjatrader-data/.gitkeep
 auth/*.sh
 !auth/entrypoint.sh

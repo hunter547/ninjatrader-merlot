@@ -2,20 +2,36 @@
 set -e
 
 SCREENSHOT_DIR="/home/ninjatrader/screenshots"
-NT_EXE="$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe"
-NT_CONFIG="$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8/Config.xml"
-
-mkdir -p "$SCREENSHOT_DIR"
-
-# Seed NinjaTrader 8 documents directory if the bind mount is empty (first run, or dev deletes host machine mount)
 NT_DOCS="$WINEPREFIX/drive_c/users/ninjatrader/Documents/NinjaTrader 8"
-if [ -z "$(ls -A "$NT_DOCS" 2>/dev/null)" ]; then
-    echo "First run detected — seeding NinjaTrader 8 documents from defaults..."
-    if ! cp -a /home/ninjatrader/NinjaTrader8-default/. "$NT_DOCS/" 2>/dev/null; then
-        echo "ERROR: Cannot write to $NT_DOCS — directory is likely owned by root."
-        echo "Fix with: sudo chown -R \$(id -u):\$(id -g) ./ninjatrader-data/"
+NT_EXE="$WINEPREFIX/drive_c/Program Files/NinjaTrader 8/bin/NinjaTrader.exe"
+NT_CONFIG="$NT_DOCS/Config.xml"
+
+# If a bind mount's host directory didn't exist, the Docker daemon created it as
+# root. We run as the non-root ninjatrader user and can't chown it ourselves, so
+# check both mounts up front and fail with the fix rather than erroring later.
+require_writable() {
+    mkdir -p "$1" 2>/dev/null
+    if ! touch "$1/.write-test" 2>/dev/null; then
+        echo "ERROR: Cannot write to $1 — the host directory is owned by root."
+        echo
+        echo "This happens when 'docker compose up' runs before the host folders exist."
+        echo "Fix with:"
+        echo "    sudo chown -R \$(id -u):\$(id -g) ./ninjatrader-data/ ./screenshots/"
+        echo "Then use 'make up' (or 'make up-native' / 'make up-mac'), which creates"
+        echo "the folders as your user before starting the container."
         exit 1
     fi
+    rm -f "$1/.write-test"
+}
+
+require_writable "$SCREENSHOT_DIR"
+require_writable "$NT_DOCS"
+
+# Seed NinjaTrader 8 documents directory if the bind mount is empty (first run, or dev deletes host machine mount).
+# .gitkeep is tracked in the repo to keep the folder present, so it doesn't count as content.
+if [ -z "$(ls -A "$NT_DOCS" 2>/dev/null | grep -v '^\.gitkeep$')" ]; then
+    echo "First run detected — seeding NinjaTrader 8 documents from defaults..."
+    cp -a /home/ninjatrader/NinjaTrader8-default/. "$NT_DOCS/"
 fi
 
 # Copy host Config.xml if mounted

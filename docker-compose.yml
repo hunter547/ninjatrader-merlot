@@ -1,6 +1,8 @@
 services:
   ninjatrader:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.trixie
     image: ninjatrader-merlot
     container_name: ninjatrader-merlot
     ports:
@@ -21,7 +23,9 @@ services:
       - NT_PASSWORD=${NT_PASSWORD:-}
 
   ninjatrader-native:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.trixie
     image: ninjatrader-merlot
     container_name: ninjatrader-merlot-native
     ports:
