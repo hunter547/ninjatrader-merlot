@@ -34,6 +34,14 @@ RUN wget -nc -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-
 RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
     && chmod +x /usr/local/bin/winetricks
 
+# NinjaTrader's data servers (hds-*/is-*.ninjatrader.com) present a certificate chained to
+# "GoDaddy TLS Root CA - R1", which Debian's ca-certificates does not ship yet. Wine builds
+# its Windows root store from the system store, so without this NinjaTrader reports
+# "Unable to connect to the NinjaTrader data server".
+# Source: https://certs.godaddy.com/repository/gd_tls_root-r1.crt
+COPY certs/godaddy-tls-root-r1.crt /usr/local/share/ca-certificates/godaddy-tls-root-r1.crt
+RUN update-ca-certificates
+
 # Create a non-root user to run Wine
 RUN useradd -m -s /bin/bash ninjatrader
 USER ninjatrader

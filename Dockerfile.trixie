@@ -110,6 +110,8 @@ FROM debian:trixie-slim
 RUN dpkg --add-architecture i386
 
 # Install only runtime dependencies
+# fonts-wine provides Tahoma, DirectWrite's fallback font: without it any text layout that
+# asks for a font that is not installed fails with E_FAIL and charts cannot open.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     xauth \
@@ -124,8 +126,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     feh \
     wine \
     wine64 \
+    ca-certificates \
+    fonts-wine \
     wine32:i386 \
     && rm -rf /var/lib/apt/lists/*
+
+# NinjaTrader's data servers (hds-*/is-*.ninjatrader.com) present a certificate chained to
+# "GoDaddy TLS Root CA - R1", which Debian's ca-certificates does not ship yet. Wine builds
+# its Windows root store from the system store, so without this NinjaTrader reports
+# "Unable to connect to the NinjaTrader data server".
+# Source: https://certs.godaddy.com/repository/gd_tls_root-r1.crt
+COPY certs/godaddy-tls-root-r1.crt /usr/local/share/ca-certificates/godaddy-tls-root-r1.crt
+RUN update-ca-certificates
 
 # Copy winetricks from builder
 COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks

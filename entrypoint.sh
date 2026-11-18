@@ -60,6 +60,17 @@ if [ -n "$NATIVE_DISPLAY" ]; then
     echo "============================================"
     echo " NinjaTrader Merlot (Native Display)"
     echo "============================================"
+
+    # The image sets Wine's Direct3D renderer to "gdi" for the Xvfb/VNC setup, which disables
+    # 3D entirely. Direct2D sits on Direct3D, so with it no chart render target can be created
+    # ("HRESULT: [0x80004005] ... Call failed" when opening a chart). On a real display, use
+    # Wine's default OpenGL renderer instead.
+    wine reg delete "HKCU\\Software\\Wine\\Direct3D" /v renderer /f >/dev/null 2>&1 || true
+    # With 3D enabled WPF would switch to hardware rendering, and its transparent windows (the
+    # login window) then kill the process with "X Error BadMatch ... RenderCreatePicture".
+    # Keep WPF on software rendering, as it was under the gdi renderer; charts still use Direct2D.
+    wine reg add "HKCU\\Software\\Microsoft\\Avalon.Graphics" /v DisableHWAcceleration /t REG_DWORD /d 1 /f >/dev/null 2>&1 || true
+    wineserver --wait
 else
     # --- Virtual display with VNC/noVNC ---
 
